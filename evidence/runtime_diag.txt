@@ -1,33 +1,5 @@
-=== disk ===
 Filesystem      Size  Used Avail Use% Mounted on
-/dev/root       145G   77G   69G  53% /
-=== memory ===
+/dev/root       145G   78G   68G  54% /
                total        used        free      shared  buff/cache   available
-Mem:           15983        9871         633          37        5861        6111
-Swap:           3071        1007        2064
-=== toolchain ===
-/usr/local/lib/android/sdk/platform-tools/adb
-/usr/local/lib/android/sdk/emulator/emulator
-/usr/local/lib/android/sdk/cmdline-tools/latest/bin/avdmanager
-=== env ===
-ANDROID_HOME=/usr/local/lib/android/sdk HOME=/home/runner
-crw-rw-rw- 1 root kvm 10, 232 Nov 20 10:57 /dev/kvm
-* daemon not running; starting now at tcp:5037
-* daemon started successfully
-Loading local repository...                                                     [=========                              ] 25% Loading local repository...       Auto-selecting single ABI x86_64
-avd_create_device=0
-Loading local repository...                                                     [=========                              ] 25% Loading local repository...       Auto-selecting single ABI x86_64
-Do you wish to create a custom hardware profile? [no] avd_create_plain=0
-wait_for_device=124
-booted=0
-List of devices attached
-
-reverse8000=1
-reverse9099=1
-install=1
-monkey=1
-Filesystem      Size  Used Avail Use% Mounted on
-/dev/root       145G   77G   69G  53% /
-               total        used        free      shared  buff/cache   available
-Mem:           15983        7340        3081          47        5952        8642
-Swap:           3071        1000        2071
+Mem:           15983        2158        6396          52        7825       13824
+Swap:           3071          22        3049
