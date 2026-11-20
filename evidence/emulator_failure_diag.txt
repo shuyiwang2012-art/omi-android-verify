@@ -3,70 +3,22 @@ outcome=failure
 List of devices attached
 emulator-5554	offline
 
---- kvm ---
-crw-rw-rw- 1 root kvm 10, 232 Nov 20 13:25 /dev/kvm
 --- free ---
                total        used        free      shared  buff/cache   available
-Mem:           15983        2046        4496          40        9836       13936
-Swap:           3071         217        2854
+Mem:           15700        1035        4480          51       10571       14665
+Swap:              0           0           0
 --- top rss ---
     PID   RSS COMMAND
-   4111 520084 python
-   4071 313696 java
-   4038 248212 MainThread
-   2241 123708 provjobd4205189
-   3959 118444 npm exec fireba
-   2331 99516 Runner.Worker
-   1553 75932 dockerd
-   2311 54176 Runner.Listener
-   1120 45512 php-fpm8.5
-   1311 42508 containerd
-   1990 42428 ExtHandler
---- avd dir ---
-total 16
-drwxr-xr-x 3 runner runner 4096 Nov 20 13:25 .
-drwxr-xr-x 3 runner runner 4096 Nov 20 13:25 ..
-drwxr-xr-x 3 runner runner 4096 Nov 20 13:25 test.avd
--rw-r--r-- 1 runner runner   81 Nov 20 13:25 test.ini
---- dmesg tail ---
-[    9.404351] pci_bus cf09:00: root bus resource [mem 0xfc0000000-0xfc00fffff window]
-[    9.404356] pci_bus cf09:00: No busn resource found for root bus, will use [bus 00-ff]
-[    9.407780] pci cf09:00:02.0: [15b3:1016] type 00 class 0x020000 PCIe Endpoint
-[    9.413573] pci cf09:00:02.0: BAR 0 [mem 0xfc0000000-0xfc00fffff 64bit pref]
-[    9.414944] pci cf09:00:02.0: enabling Extended Tags
-[    9.441977] pci cf09:00:02.0: 0.000 Gb/s available PCIe bandwidth, limited by Unknown x0 link at cf09:00:02.0 (capable of 63.008 Gb/s with 8.0 GT/s PCIe x8 link)
-[    9.452995] pci_bus cf09:00: busn_res: [bus 00-ff] end is updated to 00
-[    9.453007] pci cf09:00:02.0: BAR 0 [mem 0xfc0000000-0xfc00fffff 64bit pref]: assigned
-[    9.761850] loop0: detected capacity change from 0 to 8
-[    9.945014] mlx5_core cf09:00:02.0: enabling device (0000 -> 0002)
-[    9.948640] mlx5_core cf09:00:02.0: firmware version: 14.30.5034
-[   10.089527] mlx5_core cf09:00:02.0: Flow counters bulk query buffer size increased, bulk_query_len(8)
-[   10.192506] hv_netvsc 7ced8d80-451a-7ced-8d80-451a7ced8d80 eth0: VF registering: eth1
-[   10.192561] mlx5_core cf09:00:02.0 eth1: joined to eth0
-[   10.194305] mlx5_core cf09:00:02.0 eth1: Disabling LRO, not supported in legacy RQ
-[   10.195344] mlx5_core cf09:00:02.0 eth1: Disabling LRO, not supported in legacy RQ
-[   10.195430] mlx5_core cf09:00:02.0 eth1: Disabling LRO, not supported in legacy RQ
-[   10.195438] mlx5_core cf09:00:02.0: MLX5E: StrdRq(0) RqSz(1024) StrdSz(256) RxCqeCmprss(0 basic)
-[   10.207802] NET: Registered PF_QIPCRTR protocol family
-[   10.362199] mlx5_core cf09:00:02.0 eth1: Link up
-[   10.386839] hv_netvsc 7ced8d80-451a-7ced-8d80-451a7ced8d80 eth0: Data path switched to VF: eth1
-[   10.397778] MACsec IEEE 802.1AE
-[   10.397828] mlx5_core cf09:00:02.0 enP53001s1: renamed from eth1 (while UP)
-[   10.525771] Adding 3145724k swap on /swapfile.  Priority:-1 extents:4 across:4440060k 
-[   10.809929] kauditd_printk_skb: 110 callbacks suppressed
-[   10.809933] audit: type=1400 audit(1795179971.926:191): apparmor="STATUS" operation="profile_load" profile="unconfined" name="docker-default" pid=1655 comm="apparmor_parser"
-[   11.052200] Initializing XFRM netlink socket
-[   11.074508] bridge: filtering via arp/ip/ip6tables is no longer available by default. Update your scripts to load br_netfilter if you need this.
-[   11.121961] systemd-fstab-generator[1853]: 'ephemeral0' is not a device path, ignoring x-systemd.device-timeout= option.
-[   12.205152] systemd-fstab-generator[2112]: 'ephemeral0' is not a device path, ignoring x-systemd.device-timeout= option.
-[   12.549422] systemd-fstab-generator[2179]: 'ephemeral0' is not a device path, ignoring x-systemd.device-timeout= option.
-[   48.983266] hv_balloon: Max. dynamic memory size: 16384 MB
-[   69.195774] systemd-fstab-generator[3623]: 'ephemeral0' is not a device path, ignoring x-systemd.device-timeout= option.
-[   69.658642] systemd-fstab-generator[3701]: 'ephemeral0' is not a device path, ignoring x-systemd.device-timeout= option.
-[   70.269806] audit: type=1400 audit(1795180031.386:192): apparmor="DENIED" operation="open" class="file" profile="who" name="/etc/nsswitch.conf" pid=3753 comm="who" requested_mask="r" denied_mask="r" fsuid=0 ouid=0
-[   70.269815] audit: type=1400 audit(1795180031.386:193): apparmor="DENIED" operation="open" class="file" profile="who" name="/etc/passwd" pid=3753 comm="who" requested_mask="r" denied_mask="r" fsuid=0 ouid=0
-[   70.415985] audit: type=1400 audit(1795180031.532:194): apparmor="DENIED" operation="open" class="file" profile="who" name="/etc/nsswitch.conf" pid=3758 comm="who" requested_mask="r" denied_mask="r" fsuid=0 ouid=0
-[   70.415993] audit: type=1400 audit(1795180031.532:195): apparmor="DENIED" operation="open" class="file" profile="who" name="/etc/passwd" pid=3758 comm="who" requested_mask="r" denied_mask="r" fsuid=0 ouid=0
-[  556.613037] /proc/cgroups lists only v1 controllers, use cgroup.controllers of root cgroup for v2 info
-[ 1160.729203] kvm: kvm [9950]: vcpu0, guest rIP: 0xffffffff9cd8970f Unhandled WRMSR(0xc0010007) = 0xffff
---- emulator logs ---
+   2222 192244 Runner.Worker
+   2177 133900 provjobd3643690
+   1634 84764 dockerd
+   2203 81188 Runner.Listener
+   1446 46332 containerd
+   1220 44292 php-fpm8.5
+   1216 29544 networkd-dispat
+   1275 21368 snapd
+   1646 18924 php-fpm8.5
+   1647 18924 php-fpm8.5
+    618 17308 systemd-journal
+--- backend log tail ---
+--- emulators log tail ---
