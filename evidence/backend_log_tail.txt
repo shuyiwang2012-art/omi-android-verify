@@ -55,7 +55,7 @@ INFO utils.llm.clients: BYOK QoS profile=byok
   if result_code.value is not 0:
 INFO utils.observability.langsmith: 📊 LangSmith: DISABLED (no API key)
 INFO utils.observability.langsmith:    Set LANGSMITH_API_KEY to enable tracing and prompt fetching
-INFO uvicorn.error: Started server process [3859]
+INFO uvicorn.error: Started server process [3925]
 INFO uvicorn.error: Waiting for application startup.
 INFO config.policy.kill_switches: event=batch_policy_kill_switch policy_id=control switch=BATCH_PIPELINE_PROJECTION_PUMP_ENABLED enabled=False count=1
 INFO utils.stt_cap_cohort: event=stt_cap_cohort_changed source=none pct=0
@@ -67,4 +67,3 @@ INFO uvicorn.error: Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to qu
 INFO routers.listen.registry: Subscribed to proactive-message channel: proactive_message:listen
 WARNING utils.stt.soniox_usage: Soniox usage API read failed; retaining last successful spend sample
 INFO routers.auth: local-dev auth: minted emulator custom token for uid local-dev-user
-WARNING utils.stt.soniox_usage: Soniox usage API read failed; retaining last successful spend sample
