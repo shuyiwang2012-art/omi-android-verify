@@ -1,28 +1,5 @@
-=== disk ===
-Filesystem      Size  Used Avail Use% Mounted on
-/dev/root       145G   77G   68G  53% /
-=== memory ===
-               total        used        free      shared  buff/cache   available
-Mem:           15982       10884         682          52        4813        5097
-Swap:           3071          16        3055
-=== avd ===
-Loading local repository...                                                     [=========                              ] 25% Loading local repository...       Auto-selecting single ABI x86_64
-crw-rw---- 1 root kvm 10, 232 Nov 20 10:08 /dev/kvm
-wait_for_device=127
-booted=0
-reverse8000=127
-reverse9099=127
-install=127
-monkey=127
-wm_size=
-tap=ratio831
-INFO         | Android emulator version 37.3.10.0 (build_id 16970787) (CL:N/A)
-INFO         | Graphics backend: gfxstream
-ERROR        | Unknown AVD name [omi36], use -list-avds to see valid list.
-ERROR        | HOME is defined but there is no file omi36.ini in $HOME/.android/avd
-ERROR        | (Note: Directories are searched in the order $ANDROID_AVD_HOME, $ANDROID_SDK_HOME/avd and $HOME/.android/avd)
 Filesystem      Size  Used Avail Use% Mounted on
 /dev/root       145G   77G   68G  53% /
                total        used        free      shared  buff/cache   available
-Mem:           15982       10768         681          53        4929        5213
-Swap:           3071          16        3055
+Mem:           15982       10762         460          48        5152        5219
+Swap:           3071          50        3021
