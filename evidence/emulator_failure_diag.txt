@@ -5,20 +5,20 @@ emulator-5554	offline
 
 --- free ---
                total        used        free      shared  buff/cache   available
-Mem:           15983        1079        4284          53       11017       14903
+Mem:           15983        1092        4652          53       10636       14890
 Swap:           3071           0        3071
 --- top rss ---
     PID   RSS COMMAND
-   2494 143448 Runner.Worker
-   2202 141228 provjobd3710892
-   2474 101352 Runner.Listener
-   1509 82352 dockerd
-   1131 56204 php-fpm8.5
-   1487 48296 ExtHandler
-   1313 44612 containerd
-   1218 36856 Daemon
-   1125 29800 networkd-dispat
-   1475 21440 php-fpm8.5
-   1476 21440 php-fpm8.5
+   2074 142800 Runner.Worker
+   1990 135940 provjobd3736590
+   2055 100940 Runner.Listener
+   1358 76256 dockerd
+    932 54508 php-fpm8.5
+   1274 46480 ExtHandler
+   1107 42548 containerd
+   1001 37076 Daemon
+    923 29812 networkd-dispat
+   1310 21360 php-fpm8.5
+   1313 21360 php-fpm8.5
 --- backend log tail ---
 --- emulators log tail ---
