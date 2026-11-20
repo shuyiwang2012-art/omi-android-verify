@@ -1,24 +1,23 @@
 outcome=failure
 --- adb ---
 List of devices attached
-emulator-5554	offline
 
 --- free ---
                total        used        free      shared  buff/cache   available
-Mem:           15700        1035        4480          51       10571       14665
-Swap:              0           0           0
+Mem:           15983        1083        4849          53       10448       14899
+Swap:           3071           0        3071
 --- top rss ---
     PID   RSS COMMAND
-   2222 192244 Runner.Worker
-   2177 133900 provjobd3643690
-   1634 84764 dockerd
-   2203 81188 Runner.Listener
-   1446 46332 containerd
-   1220 44292 php-fpm8.5
-   1216 29544 networkd-dispat
-   1275 21368 snapd
-   1646 18924 php-fpm8.5
-   1647 18924 php-fpm8.5
-    618 17308 systemd-journal
+   2052 146064 Runner.Worker
+   1996 142428 provjobd6341498
+   2035 107448 Runner.Listener
+   1302 82568 dockerd
+    924 56080 php-fpm8.5
+   1277 49012 ExtHandler
+   1109 44288 containerd
+    997 36940 Daemon
+    919 29788 networkd-dispat
+   1275 21420 php-fpm8.5
+   1276 21420 php-fpm8.5
 --- backend log tail ---
 --- emulators log tail ---
