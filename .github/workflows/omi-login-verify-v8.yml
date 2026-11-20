@@ -1,0 +1,351 @@
+name: omi-login-verify-v8
+
+# 第二检查点：云端模拟器 + Auth/Firestore 模拟器 + 官方后端，完成真实登录。
+# 源码不落本仓库：运行时按 pinned commit 检出 BasedHardware/omi。
+# 不创建真实 Firebase 项目；使用 demo-omi-local 占位配置。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/omi-login-verify-v8.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  login:
+    name: Login against isolated backend on emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NDK_VERSION: "28.2.13676358"
+      APP_ID: "com.friend.ios.dev"
+      FIREBASE_PROJECT_ID: "demo-omi-local"
+      GOOGLE_CLOUD_PROJECT: "demo-omi-local"
+      GCLOUD_PROJECT: "demo-omi-local"
+      FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099"
+      FIRESTORE_EMULATOR_HOST: "127.0.0.1:8085"
+      ENCRYPTION_SECRET: "local-verify-secret-0123456789abcdef0123456789abcdef"
+      REDIS_DB_HOST: "127.0.0.1"
+      REDIS_DB_PORT: "6379"
+      ADMIN_KEY: "local-admin-key"
+      OPENAI_API_KEY: "sk-local-placeholder"
+      ELEVENLABS_API_KEY: ""
+      DEEPGRAM_EXL_OBZ: ""
+      PINECONE_API_KEY: ""
+      PINECONE_INDEX_NAME: ""
+      SONIOX_API_KEY: "local-placeholder"
+      MODULATE_API_KEY: "local-placeholder"
+
+    steps:
+      - name: Free disk space on runner
+        run: |
+          echo "before:"; df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk/25* /opt/ghc /usr/local/share/boost /usr/local/lib/android/sdk/system-images 2>/dev/null || true
+          sudo apt-get clean
+          echo "after:"; df -h /
+
+      - name: Checkout Omi app, backend and .github scripts
+        uses: actions/checkout@v4
+        with:
+          repository: BasedHardware/omi
+          ref: b301dc3d1f183770aeb041bc22d1a75cb6bedf35
+          sparse-checkout: |
+            app
+            backend
+            .github
+          sparse-checkout-cone-mode: true
+          fetch-depth: 1
+
+      - name: Record source fingerprint
+        run: |
+          mkdir -p evidence
+          git log -1 --format='commit=%H%ndate=%cI%nsubject=%s' | tee evidence/evidence_fingerprint.txt
+          git hash-object app/pubspec.yaml backend/requirements.txt | tee -a evidence/evidence_fingerprint.txt
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install system packages (redis, ffmpeg, opus)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq redis-server ffmpeg libopus0 libportaudio2 || true
+          redis-server --daemonize yes --port 6379
+          sleep 2
+          redis-cli ping
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: backend/.python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/pylock*.toml
+
+      - name: Install backend dependencies (uv, repo lockfile)
+        working-directory: backend
+        run: |
+          uv venv .venv
+          uv pip sync pylock.toml --python .venv/bin/python
+          .venv/bin/python -c "import fastapi, firebase_admin, google.cloud.firestore; print('deps ok')"
+
+      - name: Start Firebase emulators (auth + firestore)
+        run: |
+          mkdir -p emulate evidence
+          cat > emulate/firebase.json <<'JSON'
+          {
+            "emulators": {
+              "auth": { "port": 9099, "host": "127.0.0.1" },
+              "firestore": { "port": 8085, "host": "127.0.0.1" },
+              "ui": { "enabled": false }
+            },
+            "firestore": { "rules": "firestore.rules" }
+          }
+          JSON
+          cat > emulate/firestore.rules <<'RULES'
+          rules_version = '2';
+          service cloud.firestore {
+            match /databases/{database}/documents {
+              match /{document=**} { allow read, write: if true; }
+            }
+          }
+          RULES
+          cd emulate
+          nohup npx -y firebase-tools@15 emulators:start --only auth,firestore \
+            --project demo-omi-local --config firebase.json > ../emulators.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -s -o /dev/null http://127.0.0.1:9099/ && curl -s -o /dev/null http://127.0.0.1:8085/; then
+              echo "emulators up after ${i}s"; break
+            fi
+            sleep 2
+          done
+          curl -s -o /dev/null -w "auth=%{http_code} " http://127.0.0.1:9099/ || true
+          curl -s -o /dev/null -w "firestore=%{http_code}\n" http://127.0.0.1:8085/ || true
+
+      - name: Start backend against emulators
+        run: |
+          mkdir -p evidence
+          cd backend
+          nohup .venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 > ../backend.log 2>&1 &
+          echo $! > ../backend.pid
+          cd ..
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health || true)
+            if [ "$code" = "200" ]; then echo "backend up after ${i}s"; break; fi
+            if ! kill -0 "$(cat backend.pid)" 2>/dev/null; then echo "backend process exited"; break; fi
+            sleep 2
+          done
+          echo "--- health ---"
+          curl -s http://127.0.0.1:8000/health | tee evidence/health.json || true
+          echo
+          echo "--- identity smoke ---"
+          curl -s -X POST -F uid=local-dev-user http://127.0.0.1:8000/v1/auth/local-dev/custom-token | tee evidence/identity_probe.json || true
+          echo
+          if ! grep -q "custom_token" evidence/identity_probe.json; then
+            echo "identity smoke FAILED; backend log tail:"
+            tail -n 60 backend.log
+            tail -n 120 backend.log > evidence/backend_boot_failure.txt
+            exit 1
+          fi
+
+      - name: Set up Flutter 3.44.5
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.5
+          cache: true
+
+      - name: Install Android SDK packages and NDK
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}" "cmake;3.22.1"
+          df -h /
+          printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > app/android/local.properties
+
+      - name: Prepare secret-free local inputs
+        working-directory: app
+        run: |
+          mkdir -p android/app/src/dev android/app/src/prod
+          cp lib/firebase_options_local.dart lib/firebase_options_dev.dart
+          cp lib/firebase_options_local.dart lib/firebase_options_prod.dart
+          cp setup/prebuilt/google-services-local.json android/app/src/dev/google-services.json
+          cp setup/prebuilt/google-services-local.json android/app/src/prod/google-services.json
+          cp setup/prebuilt/key.properties android/key.properties
+          printf 'API_BASE_URL=\nUSE_WEB_AUTH=true\nUSE_AUTH_CUSTOM_TOKEN=true\nSTAGING_API_URL=\n' > .dev.env
+          : > .env
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build release APK for x86_64 emulator
+        working-directory: app
+        env:
+          CM_KEYSTORE_PATH: ${{ github.workspace }}/app/setup/prebuilt/debug.keystore
+          CM_KEYSTORE_PASSWORD: android
+          CM_KEY_ALIAS: androiddebugkey
+          CM_KEY_PASSWORD: android
+        run: |
+          flutter build apk --release --flavor dev --target-platform android-x64 \
+            --dart-define=OMI_APP_PROFILE=local_dev
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Enable Linux KVM and free build daemons
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+          pkill -f GradleDaemon || true
+          pkill -f KotlinCompileDaemon || true
+          free -m
+
+      - name: Boot emulator (official action), install, tap sign-in, capture
+        id: emu
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -memory 2048
+          script: |
+            set +e
+            mkdir -p evidence
+            {
+              echo "=== disk ==="; df -h /
+              echo "=== memory ==="; free -m
+              echo "=== adb ==="; which adb; adb devices
+              echo "=== boot ==="; adb shell getprop sys.boot_completed
+              echo "=== wm ==="; adb shell wm size
+            } | tee evidence/runtime_diag.txt
+            timeout 120 adb reverse tcp:8000 tcp:8000; echo "reverse8000=$?" | tee -a evidence/runtime_diag.txt
+            timeout 120 adb reverse tcp:9099 tcp:9099; echo "reverse9099=$?" | tee -a evidence/runtime_diag.txt
+            timeout 240 adb install -r app/build/app/outputs/flutter-apk/app-dev-release.apk; echo "install=$?" | tee -a evidence/runtime_diag.txt
+            for p in POST_NOTIFICATIONS RECORD_AUDIO ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION BLUETOOTH_CONNECT BLUETOOTH_SCAN; do
+              timeout 30 adb shell pm grant "$APP_ID" "android.permission.$p" >/dev/null 2>&1
+            done
+            timeout 60 adb shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1; echo "monkey=$?" | tee -a evidence/runtime_diag.txt
+            sleep 25
+            timeout 60 adb exec-out screencap -p > evidence/01_welcome.png; echo "shot1=$?" | tee -a evidence/runtime_diag.txt
+            timeout 60 adb logcat -d -v time > evidence/logcat_before_tap.txt
+            timeout 60 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+            timeout 30 adb shell cat /sdcard/ui.xml > evidence/ui.xml 2>/dev/null
+            SIZE=$(timeout 30 adb shell wm size | tr -d '\r' | awk -F'[: ]+' '{print $NF}')
+            W=${SIZE%x*}; H=${SIZE#*x}
+            echo "wm_size=${SIZE}" | tee -a evidence/runtime_diag.txt
+            tapped=0
+            if grep -q "Sign in (local dev)" evidence/ui.xml 2>/dev/null; then
+              B=$(grep -o 'text="Sign in (local dev)"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' evidence/ui.xml | head -1)
+              echo "bounds_line=${B}" | tee -a evidence/runtime_diag.txt
+              X1=$(echo "$B" | sed -n 's/.*\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\].*/\1/p')
+              Y1=$(echo "$B" | sed -n 's/.*\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\].*/\2/p')
+              X2=$(echo "$B" | sed -n 's/.*\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\].*/\3/p')
+              Y2=$(echo "$B" | sed -n 's/.*\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\].*/\4/p')
+              if [ -n "$X1" ] && [ -n "$Y1" ]; then
+                timeout 30 adb shell input tap $(( (X1 + X2) / 2 )) $(( (Y1 + Y2) / 2 )); echo "tap=bounds" | tee -a evidence/runtime_diag.txt
+                tapped=1
+              fi
+            fi
+            if [ "$tapped" = "0" ] && [ -n "$W" ]; then
+              for ratio in 831 800 860; do
+                timeout 30 adb shell input tap $((W / 2)) $((H * ratio / 1000)); echo "tap=ratio$ratio" | tee -a evidence/runtime_diag.txt
+                sleep 10
+                grep -q "local-dev auth: minted" backend.log && break
+              done
+            fi
+            sleep 12
+            timeout 60 adb exec-out screencap -p > evidence/02_after_signin.png; echo "shot2=$?" | tee -a evidence/runtime_diag.txt
+            timeout 60 adb shell dumpsys activity activities > evidence/activities.txt
+            timeout 60 adb shell dumpsys window > evidence/window.txt
+            timeout 60 adb logcat -d -v time > evidence/logcat.txt
+            timeout 30 adb shell pidof "$APP_ID" > evidence/pid.txt
+            sleep 10
+            timeout 60 adb exec-out screencap -p > evidence/03_home.png; echo "shot3=$?" | tee -a evidence/runtime_diag.txt
+            grep -E "local-dev auth|POST /v1/auth|GET /v1/users" backend.log > evidence/backend_auth_lines.txt
+            exit 0
+
+      - name: Emulator failure diagnostics
+        if: always()
+        run: |
+          mkdir -p evidence
+          {
+            echo "outcome=${{ steps.emu.outcome }}"
+            echo "--- adb ---"; adb devices || true
+            echo "--- kvm ---"; ls -l /dev/kvm || true
+            echo "--- free ---"; free -m || true
+            echo "--- top rss ---"; ps -eo pid,rss,comm --sort=-rss | head -12 || true
+            echo "--- avd dir ---"; ls -la "$HOME/.android/avd" 2>&1 || true
+            echo "--- dmesg tail ---"; sudo dmesg 2>/dev/null | tail -40 || true
+            echo "--- emulator logs ---"; find "$HOME/.android" -maxdepth 2 -name '*.log' 2>/dev/null | while read -r f; do echo "== $f"; tail -40 "$f"; done || true
+          } > evidence/emulator_failure_diag.txt 2>&1
+          wc -c evidence/emulator_failure_diag.txt
+
+      - name: Collect server-side evidence
+        if: always()
+        run: |
+          mkdir -p evidence
+          tail -n 500 backend.log > evidence/backend_log_tail.txt 2>/dev/null || true
+          tail -n 200 emulators.log > evidence/emulators_log_tail.txt 2>/dev/null || true
+          curl -s "http://127.0.0.1:8085/v1/projects/demo-omi-local/databases/(default)/documents/users" > evidence/firestore_users.json 2>/dev/null || true
+          curl -s http://127.0.0.1:8000/health > evidence/health.json 2>/dev/null || true
+          adb devices > evidence/adb_devices.txt 2>/dev/null || true
+          df -h / >> evidence/runtime_diag.txt 2>/dev/null || true
+          free -m >> evidence/runtime_diag.txt 2>/dev/null || true
+          ls -lh evidence/ || true
+
+      - name: Publish evidence via Contents API
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import base64, json, os, urllib.request
+          token = os.environ['GH_TOKEN']
+          repo = os.environ['GITHUB_REPOSITORY']
+          run_id = os.environ.get('GITHUB_RUN_ID', '')
+          api = f"https://api.github.com/repos/{repo}/contents/evidence"
+          if not os.path.isdir('evidence'):
+              print('no evidence dir'); raise SystemExit(0)
+          for name in sorted(os.listdir('evidence')):
+              p = os.path.join('evidence', name)
+              if not os.path.isfile(p):
+                  continue
+              raw = open(p, 'rb').read()
+              if len(raw) > 20 * 1024 * 1024:
+                  print('skip large', name); continue
+              url = f"{api}/{name}"
+              sha = None
+              try:
+                  req = urllib.request.Request(url, headers={'Authorization': f'Bearer {token}'})
+                  sha = json.load(urllib.request.urlopen(req)).get('sha')
+              except Exception:
+                  pass
+              body = {'message': f'evidence {name} run {run_id}', 'content': base64.b64encode(raw).decode(), 'branch': 'main'}
+              if sha:
+                  body['sha'] = sha
+              req = urllib.request.Request(url, data=json.dumps(body).encode(), method='PUT',
+                                           headers={'Authorization': f'Bearer {token}',
+                                                    'Accept': 'application/vnd.github+json',
+                                                    'Content-Type': 'application/json'})
+              try:
+                  urllib.request.urlopen(req); print('ok', name, len(raw))
+              except Exception as e:
+                  print('fail', name, e)
+          PY
+
+      - name: Upload evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-evidence
+          path: evidence/
+          if-no-files-found: warn
