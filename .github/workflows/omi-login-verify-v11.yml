@@ -157,7 +157,7 @@ jobs:
           target: default
           arch: x86_64
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -memory 2048
+          emulator-options: -wipe-data -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -memory 2048
           script: |
             set +e
             mkdir -p evidence
@@ -306,3 +306,5 @@ jobs:
           name: login-evidence
           path: evidence/
           if-no-files-found: warn
+
+# retry-attempt 1795184935
