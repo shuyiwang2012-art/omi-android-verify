@@ -1,0 +1,120 @@
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 211, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/starlette/routing.py", line 571, in __aenter__
+    await self._router.startup()
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/.venv/lib/python3.11/site-packages/starlette/routing.py", line 671, in startup
+    await handler()
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/main.py", line 260, in startup_event
+    validate_streaming_stt_env()
+  File "/home/runner/work/omi-android-verify/omi-android-verify/backend/utils/stt/streaming.py", line 873, in validate_streaming_stt_env
+    raise RuntimeError(
+RuntimeError: STT_SERVICE_MODELS lists soniox but SONIOX_API_KEY is empty; remove soniox from the serving chain or set the key
+
+INFO utils.stt_cap_cohort: event=stt_cap_cohort_changed source=none pct=0
+INFO utils.held_content_cohort: event=held_content_cohort_changed source=none pct=0
+ERROR uvicorn.error: Application startup failed. Exiting.
+INFO utils.executors: background_task cancelled: live_stt_fleet_health
+INFO utils.executors: background_task cancelled: held_content_cohort_refresh
+INFO utils.executors: background_task cancelled: stt_cap_cohort_refresh
