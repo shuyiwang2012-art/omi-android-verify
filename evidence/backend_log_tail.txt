@@ -55,7 +55,7 @@ INFO utils.llm.clients: BYOK QoS profile=byok
   if result_code.value is not 0:
 INFO utils.observability.langsmith: 📊 LangSmith: DISABLED (no API key)
 INFO utils.observability.langsmith:    Set LANGSMITH_API_KEY to enable tracing and prompt fetching
-INFO uvicorn.error: Started server process [4094]
+INFO uvicorn.error: Started server process [4123]
 INFO uvicorn.error: Waiting for application startup.
 INFO config.policy.kill_switches: event=batch_policy_kill_switch policy_id=control switch=BATCH_PIPELINE_PROJECTION_PUMP_ENABLED enabled=False count=1
 INFO utils.stt_cap_cohort: event=stt_cap_cohort_changed source=none pct=0
