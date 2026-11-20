@@ -1,0 +1,267 @@
+name: omi-android-login-verify
+
+# 第二检查点：在云端模拟器里完成真实登录（Auth 模拟器 + Firestore 模拟器 + 官方后端）
+# 源码不落本仓库：运行时按 pinned commit 检出 BasedHardware/omi 的 app/ 与 backend/。
+# 不创建真实 Firebase 项目；使用 demo-omi-local 占位配置与模拟器。
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  login:
+    name: Login against isolated backend on emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NDK_VERSION: "28.2.13676358"
+      APP_ID: "com.friend.ios.dev"
+      FIREBASE_PROJECT_ID: "demo-omi-local"
+      GOOGLE_CLOUD_PROJECT: "demo-omi-local"
+      GCLOUD_PROJECT: "demo-omi-local"
+      FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099"
+      FIRESTORE_EMULATOR_HOST: "127.0.0.1:8085"
+      ENCRYPTION_SECRET: "local-verify-secret-0123456789abcdef0123456789abcdef"
+      REDIS_DB_HOST: "127.0.0.1"
+      REDIS_DB_PORT: "6379"
+      ADMIN_KEY: "local-admin-key"
+      OPENAI_API_KEY: "sk-local-placeholder"
+      ELEVENLABS_API_KEY: ""
+      DEEPGRAM_EXL_OBZ: ""
+      PINECONE_API_KEY: ""
+      PINECONE_INDEX_NAME: ""
+
+    steps:
+      - name: Checkout Omi app and backend at pinned commit
+        uses: actions/checkout@v4
+        with:
+          repository: BasedHardware/omi
+          ref: b301dc3d1f183770aeb041bc22d1a75cb6bedf35
+          sparse-checkout: |
+            app
+            backend
+          sparse-checkout-cone-mode: true
+          fetch-depth: 1
+
+      - name: Record source fingerprint
+        run: |
+          git log -1 --format='commit=%H%ndate=%cI%nsubject=%s' | tee evidence_fingerprint.txt
+          git hash-object app/pubspec.yaml backend/requirements.txt
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Flutter 3.44.5
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.5
+          cache: true
+
+      - name: Install Android SDK packages and NDK
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}" "cmake;3.22.1"
+          printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > app/android/local.properties
+
+      - name: Prepare secret-free local inputs
+        working-directory: app
+        run: |
+          mkdir -p android/app/src/dev android/app/src/prod
+          cp lib/firebase_options_local.dart lib/firebase_options_dev.dart
+          cp lib/firebase_options_local.dart lib/firebase_options_prod.dart
+          cp setup/prebuilt/google-services-local.json android/app/src/dev/google-services.json
+          cp setup/prebuilt/google-services-local.json android/app/src/prod/google-services.json
+          cp setup/prebuilt/key.properties android/key.properties
+          printf 'API_BASE_URL=\nUSE_WEB_AUTH=true\nUSE_AUTH_CUSTOM_TOKEN=true\nSTAGING_API_URL=\n' > .dev.env
+          : > .env
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build release APK for x86_64 emulator
+        working-directory: app
+        env:
+          CM_KEYSTORE_PATH: ${{ github.workspace }}/app/setup/prebuilt/debug.keystore
+          CM_KEYSTORE_PASSWORD: android
+          CM_KEY_ALIAS: androiddebugkey
+          CM_KEY_PASSWORD: android
+        run: |
+          flutter build apk --release --flavor dev --target-platform android-x64 \
+            --dart-define=OMI_APP_PROFILE=local_dev
+          ls -lh build/app/outputs/flutter-apk/
+
+      - name: Install system packages (redis, ffmpeg, opus)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq redis-server ffmpeg libopus0 libportaudio2 || true
+          redis-server --daemonize yes --port 6379
+          sleep 2
+          redis-cli ping
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: backend/.python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/pylock*.toml
+
+      - name: Install backend dependencies (uv, repo lockfile)
+        working-directory: backend
+        run: |
+          uv venv .venv
+          uv pip sync pylock.toml --python .venv/bin/python
+          .venv/bin/python -c "import fastapi, firebase_admin, google.cloud.firestore; print('deps ok')"
+
+      - name: Start Firebase emulators (auth + firestore)
+        run: |
+          mkdir -p emulate
+          cat > emulate/firebase.json <<'JSON'
+          {
+            "emulators": {
+              "auth": { "port": 9099, "host": "127.0.0.1" },
+              "firestore": { "port": 8085, "host": "127.0.0.1" },
+              "ui": { "enabled": false }
+            },
+            "firestore": { "rules": "firestore.rules" }
+          }
+          JSON
+          cat > emulate/firestore.rules <<'RULES'
+          rules_version = '2';
+          service cloud.firestore {
+            match /databases/{database}/documents {
+              match /{document=**} { allow read, write: if true; }
+            }
+          }
+          RULES
+          cd emulate
+          nohup npx -y firebase-tools@latest emulators:start --only auth,firestore \
+            --project demo-omi-local --config firebase.json > ../emulators.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -s -o /dev/null http://127.0.0.1:9099/ && curl -s -o /dev/null http://127.0.0.1:8085/; then
+              echo "emulators up after ${i}s"; break
+            fi
+            sleep 2
+          done
+          curl -s -o /dev/null -w "auth=%{http_code} " http://127.0.0.1:9099/
+          curl -s -o /dev/null -w "firestore=%{http_code}\n" http://127.0.0.1:8085/
+
+      - name: Start backend against emulators
+        run: |
+          cd backend
+          nohup .venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 > ../backend.log 2>&1 &
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health || true)
+            if [ "$code" = "200" ]; then echo "backend up after ${i}s"; break; fi
+            sleep 2
+          done
+          echo "--- health ---"
+          curl -s http://127.0.0.1:8000/health || true
+          echo
+          echo "--- local-dev identity smoke ---"
+          curl -s -X POST -F uid=local-dev-user http://127.0.0.1:8000/v1/auth/local-dev/custom-token || true
+
+      - name: Install, launch, tap sign-in, capture evidence
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -memory 2048
+          script: |
+            set -x
+            adb reverse tcp:8000 tcp:8000
+            adb reverse tcp:9099 tcp:9099
+            adb install -r app/build/app/outputs/flutter-apk/app-dev-release.apk
+            for p in POST_NOTIFICATIONS RECORD_AUDIO ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION BLUETOOTH_CONNECT BLUETOOTH_SCAN; do
+              adb shell pm grant "$APP_ID" "android.permission.$p" || true
+            done
+            adb shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1 || true
+            sleep 25
+            mkdir -p evidence
+            adb exec-out screencap -p > evidence/01_welcome.png
+            SIZE=$(adb shell wm size | tr -d '\r' | awk -F'[: ]+' '{print $NF}')
+            W=${SIZE%x*}; H=${SIZE#*x}
+            for ratio in 831 800 860; do
+              adb shell input tap $((W / 2)) $((H * ratio / 1000))
+              sleep 12
+              if grep -q "local-dev auth: minted" backend.log; then break; fi
+            done
+            sleep 8
+            adb exec-out screencap -p > evidence/02_after_signin.png
+            sleep 8
+            adb exec-out screencap -p > evidence/03_home.png
+            adb shell dumpsys activity activities > evidence/activities.txt || true
+            adb logcat -d -v time > evidence/logcat.txt || true
+            adb shell pidof "$APP_ID" > evidence/pid.txt || true
+            adb shell "run-as $APP_ID ls -R /data/data/$APP_ID/shared_prefs" > evidence/prefs.txt 2>&1 || true
+
+      - name: Collect server-side evidence
+        if: always()
+        run: |
+          mkdir -p evidence
+          cp evidence_fingerprint.txt evidence/ 2>/dev/null || true
+          tail -n 400 backend.log > evidence/backend_log_tail.txt 2>/dev/null || true
+          grep -E "local-dev auth|POST /v1/auth|GET /v1/users|GET /v2|POST /v2" backend.log > evidence/backend_auth_lines.txt 2>/dev/null || true
+          tail -n 200 emulators.log > evidence/emulators_log_tail.txt 2>/dev/null || true
+          curl -s "http://127.0.0.1:8085/v1/projects/demo-omi-local/databases/(default)/documents/users" > evidence/firestore_users.json 2>/dev/null || true
+          curl -s -X POST -F uid=evidence-probe http://127.0.0.1:8000/v1/auth/local-dev/custom-token > evidence/identity_probe.json 2>/dev/null || true
+          ls -lh evidence/ || true
+
+      - name: Publish evidence via Contents API
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import base64, json, os, urllib.request, urllib.error
+          token = os.environ['GH_TOKEN']
+          repo = os.environ['GITHUB_REPOSITORY']
+          run_id = os.environ.get('GITHUB_RUN_ID', '')
+          api = f"https://api.github.com/repos/{repo}/contents/evidence"
+          if not os.path.isdir('evidence'):
+              print('no evidence dir'); raise SystemExit(0)
+          for name in sorted(os.listdir('evidence')):
+              p = os.path.join('evidence', name)
+              if not os.path.isfile(p):
+                  continue
+              raw = open(p, 'rb').read()
+              if len(raw) > 20 * 1024 * 1024:
+                  print('skip large', name); continue
+              url = f"{api}/{name}"
+              sha = None
+              try:
+                  req = urllib.request.Request(url, headers={'Authorization': f'Bearer {token}'})
+                  sha = json.load(urllib.request.urlopen(req)).get('sha')
+              except Exception:
+                  pass
+              body = {'message': f'evidence {name} run {run_id}', 'content': base64.b64encode(raw).decode(), 'branch': 'main'}
+              if sha:
+                  body['sha'] = sha
+              req = urllib.request.Request(url, data=json.dumps(body).encode(), method='PUT',
+                                           headers={'Authorization': f'Bearer {token}',
+                                                    'Accept': 'application/vnd.github+json',
+                                                    'Content-Type': 'application/json'})
+              try:
+                  urllib.request.urlopen(req); print('ok', name, len(raw))
+              except Exception as e:
+                  print('fail', name, e)
+          PY
+
+      - name: Upload evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-evidence
+          path: evidence/
+          if-no-files-found: warn
