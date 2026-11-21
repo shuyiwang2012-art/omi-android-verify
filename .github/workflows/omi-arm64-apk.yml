@@ -1,7 +1,9 @@
 name: omi-arm64-apk
 
-# 只做一件事：构建真机可用的 arm64 release APK，并提交到仓库 apk/ 目录。
-# 背景：模拟器用的是 x86_64 包，真机装不上。
+# 只为真机（arm64-v8a）构建一个可安装的 release APK，并提交到仓库 apk/ 分支。
+# 关键点：PostHog 安卓 SDK 4.0.0（2026-11-20 18:13Z 发布）删除了插件仍在使用的
+# PostHogOnFeatureFlags / RRStyle，导致 :posthog_flutter:compileReleaseKotlin 失败。
+# 处理：把依赖锁到 3.77.1（其 POM 依赖 core 6.49.1，两个类都在），并写 Gradle init 脚本强制解析。
 
 on:
   workflow_dispatch:
@@ -62,21 +64,27 @@ jobs:
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
 
-      - name: Pin PostHog android SDK to 3.77.1 (core 6.x, has the APIs plugin 5.28 uses)
+      - name: Pin PostHog android SDK to 3.77.1
         run: |
-          set -e
-          python3 - <<'PYEOF'
-          import glob, pathlib
-          files = ['app/android/app/build.gradle'] + glob.glob(str(pathlib.Path.home()/'.pub-cache/hosted/pub.dev/posthog_flutter-*/android/build.gradle'))
-          for f in files:
+          python3 - <<'PYEOF' 2>&1 | tee pin.log
+          import glob, os, pathlib
+          targets = ['app/android/app/build.gradle']
+          targets += glob.glob(os.path.expanduser('~/.pub-cache/hosted/pub.dev/posthog_flutter-*/android/build.gradle'))
+          for f in targets:
               p = pathlib.Path(f)
               if not p.exists():
                   print('MISS', f)
                   continue
               t = p.read_text()
               n = t.replace('com.posthog:posthog-android:[3.51.0,4.0.0]', 'com.posthog:posthog-android:3.77.1')
-              p.write_text(n)
-              print('patched' if n != t else 'UNCHANGED', f)
+              if n != t:
+                  p.write_text(n)
+                  print('PATCHED', f)
+              else:
+                  print('UNCHANGED', f)
+                  for line in t.splitlines():
+                      if 'posthog-android' in line:
+                          print('   line:', line.strip())
           PYEOF
           mkdir -p "$HOME/.gradle/init.d"
           cat > "$HOME/.gradle/init.d/pin-posthog.gradle" <<'GRADLEEOF'
@@ -85,15 +93,30 @@ jobs:
                   resolutionStrategy {
                       force 'com.posthog:posthog-android:3.77.1'
                       force 'com.posthog:posthog:6.49.1'
+                      eachDependency { details ->
+                          if (details.requested.group == 'com.posthog') {
+                              if (details.requested.name == 'posthog-android') {
+                                  details.useVersion '3.77.1'
+                              }
+                              if (details.requested.name == 'posthog') {
+                                  details.useVersion '6.49.1'
+                              }
+                          }
+                      }
                   }
               }
           }
           GRADLEEOF
-          echo "=== pin state ===" | tee ../build_arm64.log
-          grep -n "posthog-android" app/android/app/build.gradle | tee -a ../build_arm64.log
-          grep -n "posthog-android" "$HOME"/.pub-cache/hosted/pub.dev/posthog_flutter-*/android/build.gradle | tee -a ../build_arm64.log
-          if grep -q "3.51.0" app/android/app/build.gradle; then echo "PIN FAILED (app still ranged)"; exit 1; fi
-          echo "init script:"; cat "$HOME/.gradle/init.d/pin-posthog.gradle"
+          echo "=== init script ===" | tee -a pin.log
+          cat "$HOME/.gradle/init.d/pin-posthog.gradle" | tee -a pin.log
+
+      - name: Resolve check (which posthog version is actually used)
+        continue-on-error: true
+        working-directory: app/android
+        run: |
+          chmod +x gradlew 2>/dev/null || true
+          timeout 420 ./gradlew -q :posthog_flutter:dependencies --configuration releaseCompileClasspath 2>&1 \
+            | grep -i "posthog" | head -40 | tee -a ../../pin.log || echo "resolve-check failed" | tee -a ../../pin.log
 
       - name: Build arm64 APK
         working-directory: app
@@ -108,7 +131,7 @@ jobs:
             --dart-define=OMI_APP_PROFILE=local_dev 2>&1 | tee ../build_arm64.log
           ls -lh build/app/outputs/flutter-apk/ | tee -a ../build_arm64.log
 
-      - name: Commit APK to apk branch
+      - name: Commit APK and diagnostics to apk branch
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -121,35 +144,10 @@ jobs:
           mkdir -p apk
           cp "${GITHUB_WORKSPACE}/app/build/app/outputs/flutter-apk/app-dev-release.apk" apk/omi-arm64.apk 2>/dev/null || echo "apk missing"
           cp "${GITHUB_WORKSPACE}/build_arm64.log" apk/build_arm64.log 2>/dev/null || true
+          cp "${GITHUB_WORKSPACE}/pin.log" apk/pin.log 2>/dev/null || true
           ls -lh apk/
           git config user.name omi-ci-bot
           git config user.email omi-ci@local
           git add -f apk/ || true
-          git commit -q -m "apk: arm64 release build $GITHUB_RUN_ID"
+          git commit -q -m "apk: arm64 build $GITHUB_RUN_ID" || echo "nothing to commit"
           git push -q --force origin apk
-
-      - name: Upload artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: omi-arm64-apk
-          path: apk/omi-arm64.apk
-          if-no-files-found: warn
-
-# retry 1795227862
-
-# debug-attempt 1795229940
-
-# always-log 1795230576
-
-# release-arm64 1795231344
-
-# retry-kotlin 1795232105
-
-# pin-posthog 1795232972
-
-# pin-fix 1795232991
-
-# pin-posthog-sdk 1795233705
-
-# force-posthog 1795234512
