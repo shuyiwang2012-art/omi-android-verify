@@ -51,6 +51,16 @@ PROVIDER_BRANCH_NEW = """    setLoadingState(true);
       }
       final credential = await AuthService.instance.signInWithLocalDevToken();"""
 
+CHECK_DELETION_OLD = """  Future<ApiResult<AccountDeletionStatus>> checkAccountDeletion({bool refresh = false}) {
+    final uid = _auth.currentUser?.uid;"""
+CHECK_DELETION_NEW = """  Future<ApiResult<AccountDeletionStatus>> checkAccountDeletion({bool refresh = false}) {
+    // Verification harness: the session lives in preferences, not in the native SDK.
+    final uid = _auth.currentUser?.uid ??
+        (kLocalDevSessionBypass && (authToken?.isNotEmpty ?? false) ? SharedPreferencesUtil().uid : null);"""
+CHECK_OWNER_OLD = """    if (_auth.currentUser?.uid != uid) return const ApiFailure(ApiProblem(ApiProblemKind.authTerminal));"""
+CHECK_OWNER_NEW = """    final effectiveUid = _auth.currentUser?.uid ?? (kLocalDevSessionBypass ? SharedPreferencesUtil().uid : null);
+    if (effectiveUid != uid) return const ApiFailure(ApiProblem(ApiProblemKind.authTerminal));"""
+
 SIGNEDIN_OLD = """  bool isSignedIn() {
     return !_requiresReauthentication && _auth.currentUser != null && !_auth.currentUser!.isAnonymous;
   }"""
@@ -144,6 +154,20 @@ WRAPPER_NEW = """        onSignIn: () async {
           final deletion = await context.read<AuthenticationProvider>().checkAccountDeletion();"""
 
 
+def patch_deletion_gate() -> None:
+    text = PROVIDER_FILE.read_text(encoding="utf-8")
+    if CHECK_DELETION_NEW in text:
+        print("deletion gate already patched")
+        return
+    if CHECK_DELETION_OLD not in text:
+        fail("checkAccountDeletion anchor missing")
+    text = text.replace(CHECK_DELETION_OLD, CHECK_DELETION_NEW, 1)
+    if CHECK_OWNER_OLD in text:
+        text = text.replace(CHECK_OWNER_OLD, CHECK_OWNER_NEW, 1)
+    PROVIDER_FILE.write_text(text, encoding="utf-8")
+    print("deletion gate patched")
+
+
 def patch_signed_in() -> None:
     text = PROVIDER_FILE.read_text(encoding="utf-8")
     if SIGNEDIN_NEW in text:
@@ -187,6 +211,7 @@ def main() -> None:
     patch_provider()
     patch_service()
     patch_signed_in()
+    patch_deletion_gate()
     patch_wrapper()
     print("bypass patch complete")
 

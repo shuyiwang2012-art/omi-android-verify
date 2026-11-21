@@ -231,3 +231,5 @@ jobs:
 # trigger: signed-in patch
 
 # trigger: refreshIdToken patch
+
+# trigger: deletion gate patch
