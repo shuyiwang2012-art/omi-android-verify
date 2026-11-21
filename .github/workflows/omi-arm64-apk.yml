@@ -70,10 +70,19 @@ jobs:
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
 
-      - name: Pin PostHog SDK to 3.x (4.0.0 removed APIs the plugin uses)
+      - name: Force PostHog SDK 3.77.1 (plugin range includes 4.0.0, which dropped used APIs)
         run: |
-          sed -i 's|com.posthog:posthog-android://[3.51.0,4.0.0//]|com.posthog:posthog-android:3.77.1|' app/android/app/build.gradle
-          grep -n "posthog-android" app/android/app/build.gradle | head -3
+          cat >> app/android/build.gradle <<'GRADLE'
+
+          allprojects {
+              configurations.all {
+                  resolutionStrategy {
+                      force 'com.posthog:posthog-android:3.77.1'
+                  }
+              }
+          }
+          GRADLE
+          tail -12 app/android/build.gradle
 
       - name: Build arm64 APK
         working-directory: app
@@ -131,3 +140,5 @@ jobs:
 # pin-fix 1795232991
 
 # pin-posthog-sdk 1795233705
+
+# force-posthog 1795234512
