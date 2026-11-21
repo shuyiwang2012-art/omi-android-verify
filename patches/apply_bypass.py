@@ -21,6 +21,7 @@ ROOT = Path("app")
 SESSION_FILE = ROOT / "lib/services/local_dev_session.dart"
 PROVIDER_FILE = ROOT / "lib/providers/auth_provider.dart"
 SERVICE_FILE = ROOT / "lib/services/auth_service.dart"
+WRAPPER_FILE = ROOT / "lib/pages/onboarding/wrapper.dart"
 
 SESSION_SOURCE = Path(__file__).with_name("local_dev_session.dart")
 
@@ -101,6 +102,39 @@ def patch_service() -> None:
     print("auth service patched")
 
 
+WRAPPER_OLD = """        onSignIn: () async {
+          if (!mounted) return;
+          final deletion = await context.read<AuthenticationProvider>().checkAccountDeletion();"""
+WRAPPER_NEW = """        onSignIn: () async {
+          if (!mounted) return;
+          if (kLocalDevSessionBypass) {
+            // Verification harness: the session was minted locally, so go
+            // straight to the app shell without the server-side deletion probe.
+            Navigator.of(context).pushAndRemoveUntil(omiPageRoute(builder: (_) => const AppShell()), (_) => false);
+            return;
+          }
+          final deletion = await context.read<AuthenticationProvider>().checkAccountDeletion();"""
+
+
+def patch_wrapper() -> None:
+    text = WRAPPER_FILE.read_text(encoding="utf-8")
+    if "kLocalDevSessionBypass" in text:
+        print("wrapper already patched")
+        return
+    if WRAPPER_OLD not in text:
+        fail("onboarding wrapper onSignIn anchor missing")
+    text = text.replace(WRAPPER_OLD, WRAPPER_NEW, 1)
+    import_anchor = "import 'package:omi/services/onboarding_sync_runtime.dart';"
+    if import_anchor in text and "local_dev_session.dart" not in text:
+        text = text.replace(
+            import_anchor,
+            import_anchor + "\nimport 'package:omi/services/local_dev_session.dart';",
+            1,
+        )
+    WRAPPER_FILE.write_text(text, encoding="utf-8")
+    print("wrapper patched")
+
+
 def install_session_file() -> None:
     if not SESSION_SOURCE.exists():
         fail(f"missing {SESSION_SOURCE}")
@@ -112,6 +146,7 @@ def main() -> None:
     install_session_file()
     patch_provider()
     patch_service()
+    patch_wrapper()
     print("bypass patch complete")
 
 
