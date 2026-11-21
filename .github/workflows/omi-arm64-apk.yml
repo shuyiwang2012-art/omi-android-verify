@@ -51,8 +51,10 @@ jobs:
       - name: Pin analytics plugin (build-only override)
         working-directory: app
         run: |
-          printf '\ndependency_overrides://n  posthog_flutter: 5.24.0\n' >> pubspec.yaml
-          tail -4 pubspec.yaml
+          if ! grep -q 'posthog_flutter: 5.24.0' pubspec.yaml; then
+            sed -i '/^dependency_overrides:/a\  posthog_flutter: 5.24.0' pubspec.yaml
+          fi
+          grep -A4 '^dependency_overrides:' pubspec.yaml
 
       - name: Prepare secret-free local inputs
         working-directory: app
@@ -120,3 +122,5 @@ jobs:
 # retry-kotlin 1795232105
 
 # pin-posthog 1795232972
+
+# pin-fix 1795232991
