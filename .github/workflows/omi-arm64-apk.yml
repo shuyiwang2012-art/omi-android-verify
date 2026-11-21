@@ -109,6 +109,20 @@ jobs:
           GRADLEEOF
           echo "=== init script ===" | tee -a pin.log
           cat "$HOME/.gradle/init.d/pin-posthog.gradle" | tee -a pin.log
+          ls -1 "$HOME"/.pub-cache/hosted/pub.dev/ | grep posthog | tee -a pin.log || true
+          python3 - <<'PYEOF' 2>&1 | tee -a pin.log
+          import glob, os
+          files = glob.glob(os.path.expanduser('~/.pub-cache/hosted/pub.dev/posthog_flutter-*/android/build.gradle'))
+          print('plugin build.gradle files:', files)
+          ok = False
+          for f in files:
+              t = open(f).read()
+              if 'com.posthog:posthog-android:3.77.1' in t:
+                  ok = True
+                  print('VERIFIED', f)
+          if not ok:
+              raise SystemExit('PIN NOT APPLIED to plugin build.gradle')
+          PYEOF
 
       - name: Resolve check (which posthog version is actually used)
         continue-on-error: true
@@ -131,11 +145,23 @@ jobs:
             --dart-define=OMI_APP_PROFILE=local_dev 2>&1 | tee ../build_arm64.log
           ls -lh build/app/outputs/flutter-apk/ | tee -a ../build_arm64.log
 
+      - name: Upload diagnostics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-build-diagnostics
+          path: |
+            pin.log
+            build_arm64.log
+            app/build/app/outputs/flutter-apk/app-dev-release.apk
+          if-no-files-found: warn
+
       - name: Commit APK and diagnostics to apk branch
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set +e
           mkdir -p /tmp/apkrepo && cd /tmp/apkrepo
           git init -q
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
