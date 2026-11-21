@@ -70,7 +70,7 @@ jobs:
           CM_KEY_ALIAS: androiddebugkey
           CM_KEY_PASSWORD: android
         run: |
-          flutter build apk --release --flavor dev --target-platform android-arm64 --split-per-abi \
+          flutter build apk --release --flavor dev --target-platform android-arm64 \
             --dart-define=OMI_APP_PROFILE=local_dev
           ls -lh build/app/outputs/flutter-apk/
 
@@ -84,7 +84,7 @@ jobs:
           git fetch -q --depth 1 origin main
           git checkout -q -b apk FETCH_HEAD
           mkdir -p apk
-          cp "${GITHUB_WORKSPACE}/app/build/app/outputs/flutter-apk/app-dev-arm64-v8a-release.apk" apk/omi-arm64.apk
+          cp "${GITHUB_WORKSPACE}/app/build/app/outputs/flutter-apk/app-dev-release.apk" apk/omi-arm64.apk
           ls -lh apk/
           git config user.name omi-ci-bot
           git config user.email omi-ci@local
@@ -99,3 +99,5 @@ jobs:
           name: omi-arm64-apk
           path: apk/omi-arm64.apk
           if-no-files-found: warn
+
+# retry 1795227862
