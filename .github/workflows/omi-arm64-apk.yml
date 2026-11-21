@@ -48,6 +48,12 @@ jobs:
           "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}" "cmake;3.22.1"
           printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > app/android/local.properties
 
+      - name: Pin analytics plugin (build-only override)
+        working-directory: app
+        run: |
+          printf '\ndependency_overrides://n  posthog_flutter: 5.24.0\n' >> pubspec.yaml
+          tail -4 pubspec.yaml
+
       - name: Prepare secret-free local inputs
         working-directory: app
         run: |
@@ -112,3 +118,5 @@ jobs:
 # release-arm64 1795231344
 
 # retry-kotlin 1795232105
+
+# pin-posthog 1795232972
