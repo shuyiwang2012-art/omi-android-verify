@@ -63,10 +63,12 @@ Future<LocalDevSession> mintLocalDevSession({String uid = 'local-dev-user'}) asy
 
   final decoded = json.decode(exchange.body) as Map<String, dynamic>;
   final idToken = decoded['idToken'] as String?;
-  final localId = decoded['localId'] as String?;
-  if (idToken == null || idToken.isEmpty || localId == null || localId.isEmpty) {
-    throw StateError('Auth emulator exchange returned an incomplete session');
+  if (idToken == null || idToken.isEmpty) {
+    throw StateError('Auth emulator exchange returned no ID token');
   }
+  // The emulator's VerifyCustomTokenResponse omits localId, so the principal we
+  // asked the harness to mint is authoritative here.
+  final localId = (decoded['localId'] as String?) ?? uid;
 
   return LocalDevSession(uid: localId, idToken: idToken);
 }
