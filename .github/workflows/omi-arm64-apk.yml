@@ -156,8 +156,38 @@ jobs:
             app/build/app/outputs/flutter-apk/app-dev-release.apk
           if-no-files-found: warn
 
-      - name: Commit APK and diagnostics to apk branch
+      - name: Publish APK as GitHub Release asset
         if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          APK=app/build/app/outputs/flutter-apk/app-dev-release.apk
+          if [ ! -f "$APK" ]; then echo "no apk produced"; exit 0; fi
+          TAG="apk-${GITHUB_RUN_ID}"
+          printf '{"tag_name":"%s","name":"arm64 APK %s","body":"arm64 release build of Omi app @ b301dc3d"}' "$TAG" "$TAG" > rel.json
+          curl -s -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases" -d @rel.json > relresp.json
+          python3 - <<'PYEOF'
+          import json
+          d = json.load(open('relresp.json'))
+          print('release:', d.get('tag_name'), d.get('upload_url', '')[:80], d.get('message', ''))
+          open('upload_url.txt', 'w').write((d.get('upload_url') or '').split('{')[0])
+          PYEOF
+          UP=$(cat upload_url.txt)
+          if [ -z "$UP" ]; then echo "release creation failed"; head -c 300 relresp.json; exit 1; fi
+          curl -s -X POST -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @"$APK" "$UP?name=omi-arm64.apk" -o asset.json
+          python3 - <<'PYEOF'
+          import json
+          d = json.load(open('asset.json'))
+          print('asset:', d.get('name'), d.get('state'), d.get('browser_download_url'), d.get('message', ''))
+          PYEOF
+
+      - name: Commit diagnostics to apk branch (best effort)
+        if: always()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
