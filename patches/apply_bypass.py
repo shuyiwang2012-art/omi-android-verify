@@ -39,6 +39,8 @@ PROVIDER_BRANCH_NEW = """    setLoadingState(true);
         SharedPreferencesUtil().uid = session.uid;
         SharedPreferencesUtil().authToken = session.idToken;
         SharedPreferencesUtil().onboardingCompleted = true;
+        SharedPreferencesUtil().aiConsentGiven = true;
+        SharedPreferencesUtil().permissionsCompleted = true;
         authToken = session.idToken;
         _requiresReauthentication = false;
         Logger.debug('local-dev bypass: session established for ${session.uid}');
@@ -48,6 +50,14 @@ PROVIDER_BRANCH_NEW = """    setLoadingState(true);
         return;
       }
       final credential = await AuthService.instance.signInWithLocalDevToken();"""
+
+SIGNEDIN_OLD = """  bool isSignedIn() {
+    return !_requiresReauthentication && _auth.currentUser != null && !_auth.currentUser!.isAnonymous;
+  }"""
+SIGNEDIN_NEW = """  bool isSignedIn() {
+    if (kLocalDevSessionBypass && (authToken?.isNotEmpty ?? false)) return true;
+    return !_requiresReauthentication && _auth.currentUser != null && !_auth.currentUser!.isAnonymous;
+  }"""
 
 SERVICE_OLD = """  Future<String?> getIdToken() async {
     final result = await refreshIdToken();"""
@@ -116,6 +126,18 @@ WRAPPER_NEW = """        onSignIn: () async {
           final deletion = await context.read<AuthenticationProvider>().checkAccountDeletion();"""
 
 
+def patch_signed_in() -> None:
+    text = PROVIDER_FILE.read_text(encoding="utf-8")
+    if SIGNEDIN_NEW in text:
+        print("isSignedIn already patched")
+        return
+    if SIGNEDIN_OLD not in text:
+        fail("isSignedIn anchor missing")
+    text = text.replace(SIGNEDIN_OLD, SIGNEDIN_NEW, 1)
+    PROVIDER_FILE.write_text(text, encoding="utf-8")
+    print("isSignedIn patched")
+
+
 def patch_wrapper() -> None:
     text = WRAPPER_FILE.read_text(encoding="utf-8")
     if "kLocalDevSessionBypass" in text:
@@ -146,6 +168,7 @@ def main() -> None:
     install_session_file()
     patch_provider()
     patch_service()
+    patch_signed_in()
     patch_wrapper()
     print("bypass patch complete")
 

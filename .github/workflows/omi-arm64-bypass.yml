@@ -227,3 +227,5 @@ jobs:
 # rebuild trigger: localId fallback
 
 # trigger: wrapper patch
+
+# trigger: signed-in patch
