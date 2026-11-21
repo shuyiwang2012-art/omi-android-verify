@@ -59,6 +59,21 @@ SIGNEDIN_NEW = """  bool isSignedIn() {
     return !_requiresReauthentication && _auth.currentUser != null && !_auth.currentUser!.isAnonymous;
   }"""
 
+REFRESH_OLD = """  Future<AuthTokenResult> refreshIdToken() {
+    if (_sessionExpired) {"""
+REFRESH_NEW = """  Future<AuthTokenResult> refreshIdToken() {
+    if (kLocalDevSessionBypass && _tokenGateway.currentUser == null) {
+      // Verification harness: the session lives in preferences, not in the
+      // native SDK, so report the cached token instead of asking Firebase.
+      final cached = SharedPreferencesUtil().authToken;
+      if (cached.isNotEmpty) {
+        return Future<AuthTokenResult>.value(
+          AuthTokenSuccess(token: cached, expirationTime: DateTime.now().add(const Duration(minutes: 50))),
+        );
+      }
+    }
+    if (_sessionExpired) {"""
+
 SERVICE_OLD = """  Future<String?> getIdToken() async {
     final result = await refreshIdToken();"""
 SERVICE_NEW = """  Future<String?> getIdToken() async {
@@ -101,6 +116,9 @@ def patch_service() -> None:
     if SERVICE_OLD not in text:
         fail("auth service getIdToken anchor missing")
     text = text.replace(SERVICE_OLD, SERVICE_NEW, 1)
+    if REFRESH_OLD in text:
+        text = text.replace(REFRESH_OLD, REFRESH_NEW, 1)
+        print("refreshIdToken patched")
     import_anchor = "import 'package:omi/env/env.dart';"
     if import_anchor in text and "local_dev_session.dart" not in text:
         text = text.replace(

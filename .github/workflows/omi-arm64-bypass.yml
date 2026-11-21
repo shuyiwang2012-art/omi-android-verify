@@ -229,3 +229,5 @@ jobs:
 # trigger: wrapper patch
 
 # trigger: signed-in patch
+
+# trigger: refreshIdToken patch
