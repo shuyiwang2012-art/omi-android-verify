@@ -76,6 +76,7 @@ jobs:
           ls -lh build/app/outputs/flutter-apk/ | tee -a ../build_arm64.log
 
       - name: Commit APK to apk branch
+        if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -85,12 +86,12 @@ jobs:
           git fetch -q --depth 1 origin main
           git checkout -q -b apk FETCH_HEAD
           mkdir -p apk
-          cp "${GITHUB_WORKSPACE}/app/build/app/outputs/flutter-apk/app-dev-debug.apk" apk/omi-arm64.apk
+          cp "${GITHUB_WORKSPACE}/app/build/app/outputs/flutter-apk/app-dev-debug.apk" apk/omi-arm64.apk 2>/dev/null || echo "apk missing"
           cp "${GITHUB_WORKSPACE}/build_arm64.log" apk/build_arm64.log 2>/dev/null || true
           ls -lh apk/
           git config user.name omi-ci-bot
           git config user.email omi-ci@local
-          git add -f apk/omi-arm64.apk apk/build_arm64.log 2>/dev/null || git add -f apk/omi-arm64.apk
+          git add -f apk/ || true
           git commit -q -m "apk: arm64 release build $GITHUB_RUN_ID"
           git push -q --force origin apk
 
@@ -105,3 +106,5 @@ jobs:
 # retry 1795227862
 
 # debug-attempt 1795229940
+
+# always-log 1795230576
