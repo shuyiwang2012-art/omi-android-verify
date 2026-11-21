@@ -1,0 +1,225 @@
+name: omi-arm64-bypass
+
+# 只为真机（arm64-v8a）构建一个可安装的 release APK，并提交到仓库 apk/ 分支。
+# 关键点：PostHog 安卓 SDK 4.0.0（2026-11-20 18:13Z 发布）删除了插件仍在使用的
+# PostHogOnFeatureFlags / RRStyle，导致 :posthog_flutter:compileReleaseKotlin 失败。
+# 处理：把依赖锁到 3.77.1（其 POM 依赖 core 6.49.1，两个类都在），并写 Gradle init 脚本强制解析。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/omi-arm64-bypass.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NDK_VERSION: "28.2.13676358"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: BasedHardware/omi
+          ref: b301dc3d1f183770aeb041bc22d1a75cb6bedf35
+          sparse-checkout: |
+            app
+            .github
+          sparse-checkout-cone-mode: true
+          fetch-depth: 1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.5
+          cache: true
+
+      - name: Install Android SDK packages and NDK
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}" "cmake;3.22.1"
+          printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > app/android/local.properties
+
+      - name: Prepare secret-free local inputs
+        working-directory: app
+        run: |
+          mkdir -p android/app/src/dev android/app/src/prod
+          cp lib/firebase_options_local.dart lib/firebase_options_dev.dart
+          cp lib/firebase_options_local.dart lib/firebase_options_prod.dart
+          cp setup/prebuilt/google-services-local.json android/app/src/dev/google-services.json
+          cp setup/prebuilt/google-services-local.json android/app/src/prod/google-services.json
+          cp setup/prebuilt/key.properties android/key.properties
+          printf 'API_BASE_URL=\nUSE_WEB_AUTH=true\nUSE_AUTH_CUSTOM_TOKEN=true\nSTAGING_API_URL=\n' > .dev.env
+          : > .env
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+
+      - name: Checkout harness patches
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: main
+          path: harness
+          sparse-checkout: |
+            patches
+          sparse-checkout-cone-mode: true
+
+      - name: Apply local_dev session bypass patch
+        run: |
+          python3 harness/patches/apply_bypass.py
+          grep -n "kLocalDevSessionBypass" app/lib/providers/auth_provider.dart app/lib/services/auth_service.dart | head
+
+      - name: Pin PostHog android SDK to 3.77.1
+        run: |
+          python3 - <<'PYEOF' 2>&1 | tee pin.log
+          import glob, os, pathlib
+          targets = ['app/android/app/build.gradle']
+          targets += glob.glob(os.path.expanduser('~/.pub-cache/hosted/pub.dev/posthog_flutter-*/android/build.gradle'))
+          for f in targets:
+              p = pathlib.Path(f)
+              if not p.exists():
+                  print('MISS', f)
+                  continue
+              t = p.read_text()
+              n = t.replace('com.posthog:posthog-android:[3.51.0,4.0.0]', 'com.posthog:posthog-android:3.77.1')
+              if n != t:
+                  p.write_text(n)
+                  print('PATCHED', f)
+              else:
+                  print('UNCHANGED', f)
+                  for line in t.splitlines():
+                      if 'posthog-android' in line:
+                          print('   line:', line.strip())
+          PYEOF
+          mkdir -p "$HOME/.gradle/init.d"
+          cat > "$HOME/.gradle/init.d/pin-posthog.gradle" <<'GRADLEEOF'
+          allprojects {
+              configurations.all {
+                  resolutionStrategy {
+                      force 'com.posthog:posthog-android:3.77.1'
+                      force 'com.posthog:posthog:6.49.1'
+                      eachDependency { details ->
+                          if (details.requested.group == 'com.posthog') {
+                              if (details.requested.name == 'posthog-android') {
+                                  details.useVersion '3.77.1'
+                              }
+                              if (details.requested.name == 'posthog') {
+                                  details.useVersion '6.49.1'
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          GRADLEEOF
+          echo "=== init script ===" | tee -a pin.log
+          cat "$HOME/.gradle/init.d/pin-posthog.gradle" | tee -a pin.log
+          ls -1 "$HOME"/.pub-cache/hosted/pub.dev/ | grep posthog | tee -a pin.log || true
+          python3 - <<'PYEOF' 2>&1 | tee -a pin.log
+          import glob, os
+          files = glob.glob(os.path.expanduser('~/.pub-cache/hosted/pub.dev/posthog_flutter-*/android/build.gradle'))
+          print('plugin build.gradle files:', files)
+          ok = False
+          for f in files:
+              t = open(f).read()
+              if 'com.posthog:posthog-android:3.77.1' in t:
+                  ok = True
+                  print('VERIFIED', f)
+          if not ok:
+              raise SystemExit('PIN NOT APPLIED to plugin build.gradle')
+          PYEOF
+
+      - name: Resolve check (which posthog version is actually used)
+        continue-on-error: true
+        working-directory: app/android
+        run: |
+          chmod +x gradlew 2>/dev/null || true
+          timeout 420 ./gradlew -q :posthog_flutter:dependencies --configuration releaseCompileClasspath 2>&1 \
+            | grep -i "posthog" | head -40 | tee -a ../../pin.log || echo "resolve-check failed" | tee -a ../../pin.log
+
+      - name: Build arm64 APK
+        working-directory: app
+        env:
+          CM_KEYSTORE_PATH: ${{ github.workspace }}/app/setup/prebuilt/debug.keystore
+          CM_KEYSTORE_PASSWORD: android
+          CM_KEY_ALIAS: androiddebugkey
+          CM_KEY_PASSWORD: android
+        run: |
+          set -o pipefail
+          flutter build apk --release --flavor dev --target-platform android-arm64 \
+            --dart-define=OMI_APP_PROFILE=local_dev \
+            --dart-define=OMI_LOCAL_SESSION_BYPASS=true 2>&1 | tee ../build_arm64.log
+          ls -lh build/app/outputs/flutter-apk/ | tee -a ../build_arm64.log
+
+      - name: Upload diagnostics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-build-diagnostics
+          path: |
+            pin.log
+            build_arm64.log
+            app/build/app/outputs/flutter-apk/app-dev-release.apk
+          if-no-files-found: warn
+
+      - name: Publish APK as GitHub Release asset
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          APK=app/build/app/outputs/flutter-apk/app-dev-release.apk
+          if [ ! -f "$APK" ]; then echo "no apk produced"; exit 0; fi
+          TAG="apk-${GITHUB_RUN_ID}"
+          printf '{"tag_name":"%s","name":"arm64 APK %s","body":"arm64 release build with local_dev session bypass"}' "$TAG" "$TAG" > rel.json
+          curl -s -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases" -d @rel.json > relresp.json
+          python3 - <<'PYEOF'
+          import json
+          d = json.load(open('relresp.json'))
+          print('release:', d.get('tag_name'), d.get('upload_url', '')[:80], d.get('message', ''))
+          open('upload_url.txt', 'w').write((d.get('upload_url') or '').split('{')[0])
+          PYEOF
+          UP=$(cat upload_url.txt)
+          if [ -z "$UP" ]; then echo "release creation failed"; head -c 300 relresp.json; exit 1; fi
+          curl -s -X POST -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @"$APK" "$UP?name=omi-arm64.apk" -o asset.json
+          python3 - <<'PYEOF'
+          import json
+          d = json.load(open('asset.json'))
+          print('asset:', d.get('name'), d.get('state'), d.get('browser_download_url'), d.get('message', ''))
+          PYEOF
+
+      - name: Commit diagnostics to apk branch (best effort)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          mkdir -p /tmp/apkrepo && cd /tmp/apkrepo
+          git init -q
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --depth 1 origin main
+          git checkout -q -b apk FETCH_HEAD
+          mkdir -p apk
+          cp "${GITHUB_WORKSPACE}/app/build/app/outputs/flutter-apk/app-dev-release.apk" apk/omi-arm64.apk 2>/dev/null || echo "apk missing"
+          cp "${GITHUB_WORKSPACE}/build_arm64.log" apk/build_arm64.log 2>/dev/null || true
+          cp "${GITHUB_WORKSPACE}/pin.log" apk/pin.log 2>/dev/null || true
+          ls -lh apk/
+          git config user.name omi-ci-bot
+          git config user.email omi-ci@local
+          git add -f apk/ || true
+          git commit -q -m "apk: arm64 build $GITHUB_RUN_ID" || echo "nothing to commit"
+          git push -q --force origin apk
