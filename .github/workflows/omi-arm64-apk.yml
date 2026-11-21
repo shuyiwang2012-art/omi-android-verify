@@ -71,7 +71,7 @@ jobs:
           CM_KEY_PASSWORD: android
         run: |
           set -o pipefail
-          flutter build apk --debug --flavor dev --target-platform android-arm64 \
+          flutter build apk --release --flavor dev --target-platform android-arm64 \
             --dart-define=OMI_APP_PROFILE=local_dev 2>&1 | tee ../build_arm64.log
           ls -lh build/app/outputs/flutter-apk/ | tee -a ../build_arm64.log
 
@@ -86,7 +86,7 @@ jobs:
           git fetch -q --depth 1 origin main
           git checkout -q -b apk FETCH_HEAD
           mkdir -p apk
-          cp "${GITHUB_WORKSPACE}/app/build/app/outputs/flutter-apk/app-dev-debug.apk" apk/omi-arm64.apk 2>/dev/null || echo "apk missing"
+          cp "${GITHUB_WORKSPACE}/app/build/app/outputs/flutter-apk/app-dev-release.apk" apk/omi-arm64.apk 2>/dev/null || echo "apk missing"
           cp "${GITHUB_WORKSPACE}/build_arm64.log" apk/build_arm64.log 2>/dev/null || true
           ls -lh apk/
           git config user.name omi-ci-bot
@@ -108,3 +108,5 @@ jobs:
 # debug-attempt 1795229940
 
 # always-log 1795230576
+
+# release-arm64 1795231344
