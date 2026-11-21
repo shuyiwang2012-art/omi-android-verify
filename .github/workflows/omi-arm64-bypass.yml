@@ -223,3 +223,5 @@ jobs:
           git add -f apk/ || true
           git commit -q -m "apk: arm64 build $GITHUB_RUN_ID" || echo "nothing to commit"
           git push -q --force origin apk
+
+# rebuild trigger: localId fallback
