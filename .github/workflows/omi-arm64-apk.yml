@@ -62,17 +62,38 @@ jobs:
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
 
-      - name: Pin PostHog android SDK to 3.77.1 (4.0.0/core 7.0.0 removed used APIs)
+      - name: Pin PostHog android SDK to 3.77.1 (core 6.x, has the APIs plugin 5.28 uses)
         run: |
           set -e
-          sed -i 's|com.posthog:posthog-android://[3.51.0,4.0.0//]|com.posthog:posthog-android:3.77.1|g' app/android/app/build.gradle
-          grep -n "posthog-android" app/android/app/build.gradle | head -3
-          for f in "$HOME"/.pub-cache/hosted/pub.dev/posthog_flutter-*/android/build.gradle; do
-            [ -f "$f" ] || continue
-            sed -i 's|com.posthog:posthog-android://[3.51.0,4.0.0//]|com.posthog:posthog-android:3.77.1|g' "$f"
-            echo "patched plugin: $f"
-            grep -n "posthog-android" "$f" | head -2
-          done
+          python3 - <<'PYEOF'
+          import glob, pathlib
+          files = ['app/android/app/build.gradle'] + glob.glob(str(pathlib.Path.home()/'.pub-cache/hosted/pub.dev/posthog_flutter-*/android/build.gradle'))
+          for f in files:
+              p = pathlib.Path(f)
+              if not p.exists():
+                  print('MISS', f)
+                  continue
+              t = p.read_text()
+              n = t.replace('com.posthog:posthog-android:[3.51.0,4.0.0]', 'com.posthog:posthog-android:3.77.1')
+              p.write_text(n)
+              print('patched' if n != t else 'UNCHANGED', f)
+          PYEOF
+          mkdir -p "$HOME/.gradle/init.d"
+          cat > "$HOME/.gradle/init.d/pin-posthog.gradle" <<'GRADLEEOF'
+          allprojects {
+              configurations.all {
+                  resolutionStrategy {
+                      force 'com.posthog:posthog-android:3.77.1'
+                      force 'com.posthog:posthog:6.49.1'
+                  }
+              }
+          }
+          GRADLEEOF
+          echo "=== pin state ===" | tee ../build_arm64.log
+          grep -n "posthog-android" app/android/app/build.gradle | tee -a ../build_arm64.log
+          grep -n "posthog-android" "$HOME"/.pub-cache/hosted/pub.dev/posthog_flutter-*/android/build.gradle | tee -a ../build_arm64.log
+          if grep -q "3.51.0" app/android/app/build.gradle; then echo "PIN FAILED (app still ranged)"; exit 1; fi
+          echo "init script:"; cat "$HOME/.gradle/init.d/pin-posthog.gradle"
 
       - name: Build arm64 APK
         working-directory: app
