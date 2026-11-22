@@ -155,6 +155,38 @@ WRAPPER_NEW = """        onSignIn: () async {
           final deletion = await context.read<AuthenticationProvider>().checkAccountDeletion();"""
 
 
+TOKEN_LISTENER_OLD = """        if (user == null) {
+          Logger.debug('User is currently signed out or the token has been revoked!');
+          SharedPreferencesUtil().authToken = '';
+          SharedPreferencesUtil().tokenExpirationTime = 0;
+          authToken = null;
+        } else {"""
+TOKEN_LISTENER_NEW = """        if (user == null) {
+          if (kLocalDevSessionBypass && SharedPreferencesUtil().authToken.isNotEmpty) {
+            // Verification harness: the session lives in preferences, so a
+            // null Firebase user must not wipe it.
+            Logger.debug('local-dev bypass: keeping the local session visible');
+          } else {
+            Logger.debug('User is currently signed out or the token has been revoked!');
+            SharedPreferencesUtil().authToken = '';
+            SharedPreferencesUtil().tokenExpirationTime = 0;
+            authToken = null;
+          }
+        } else {"""
+
+
+def patch_token_listener() -> None:
+    text = PROVIDER_FILE.read_text(encoding="utf-8")
+    if TOKEN_LISTENER_NEW in text:
+        print("token listener already patched")
+        return
+    if TOKEN_LISTENER_OLD not in text:
+        fail("idTokenChanges listener anchor missing")
+    text = text.replace(TOKEN_LISTENER_OLD, TOKEN_LISTENER_NEW, 1)
+    PROVIDER_FILE.write_text(text, encoding="utf-8")
+    print("token listener patched")
+
+
 def patch_deletion_gate() -> None:
     text = PROVIDER_FILE.read_text(encoding="utf-8")
     if CHECK_DELETION_NEW in text:
@@ -213,6 +245,7 @@ def main() -> None:
     patch_service()
     patch_signed_in()
     patch_deletion_gate()
+    patch_token_listener()
     patch_wrapper()
     print("bypass patch complete")
 
