@@ -55,8 +55,9 @@ CHECK_DELETION_OLD = """  Future<ApiResult<AccountDeletionStatus>> checkAccountD
     final uid = _auth.currentUser?.uid;"""
 CHECK_DELETION_NEW = """  Future<ApiResult<AccountDeletionStatus>> checkAccountDeletion({bool refresh = false}) {
     // Verification harness: the session lives in preferences, not in the native SDK.
+    final localToken = SharedPreferencesUtil().authToken;
     final uid = _auth.currentUser?.uid ??
-        (kLocalDevSessionBypass && (authToken?.isNotEmpty ?? false) ? SharedPreferencesUtil().uid : null);"""
+        (kLocalDevSessionBypass && localToken.isNotEmpty ? SharedPreferencesUtil().uid : null);"""
 CHECK_OWNER_OLD = """    if (_auth.currentUser?.uid != uid) return const ApiFailure(ApiProblem(ApiProblemKind.authTerminal));"""
 CHECK_OWNER_NEW = """    final effectiveUid = _auth.currentUser?.uid ?? (kLocalDevSessionBypass ? SharedPreferencesUtil().uid : null);
     if (effectiveUid != uid) return const ApiFailure(ApiProblem(ApiProblemKind.authTerminal));"""

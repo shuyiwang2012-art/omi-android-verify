@@ -233,3 +233,5 @@ jobs:
 # trigger: refreshIdToken patch
 
 # trigger: deletion gate patch
+
+# trigger: gate reads prefs token
