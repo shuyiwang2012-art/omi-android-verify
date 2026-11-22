@@ -235,3 +235,5 @@ jobs:
 # trigger: deletion gate patch
 
 # trigger: gate reads prefs token
+
+# trigger: keep local session on null user
