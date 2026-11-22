@@ -241,3 +241,5 @@ jobs:
 # trigger: listener guard included
 
 # trigger: gate returns benign status
+
+# trigger: service isSignedIn

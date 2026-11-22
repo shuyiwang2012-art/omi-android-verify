@@ -75,6 +75,16 @@ SIGNEDIN_NEW = """  bool isSignedIn() {
     return !_requiresReauthentication && _auth.currentUser != null && !_auth.currentUser!.isAnonymous;
   }"""
 
+SERVICE_SIGNEDIN_OLD = """  bool isSignedIn() {
+    final user = _tokenGateway.currentUser;
+    return user != null && !user.isAnonymous;
+  }"""
+SERVICE_SIGNEDIN_NEW = """  bool isSignedIn() {
+    if (kLocalDevSessionBypass && SharedPreferencesUtil().authToken.isNotEmpty) return true;
+    final user = _tokenGateway.currentUser;
+    return user != null && !user.isAnonymous;
+  }"""
+
 REFRESH_OLD = """  Future<AuthTokenResult> refreshIdToken() {
     if (_sessionExpired) {"""
 REFRESH_NEW = """  Future<AuthTokenResult> refreshIdToken() {
@@ -132,6 +142,9 @@ def patch_service() -> None:
     if SERVICE_OLD not in text:
         fail("auth service getIdToken anchor missing")
     text = text.replace(SERVICE_OLD, SERVICE_NEW, 1)
+    if SERVICE_SIGNEDIN_OLD in text:
+        text = text.replace(SERVICE_SIGNEDIN_OLD, SERVICE_SIGNEDIN_NEW, 1)
+        print("service isSignedIn patched")
     if REFRESH_OLD in text:
         text = text.replace(REFRESH_OLD, REFRESH_NEW, 1)
         print("refreshIdToken patched")
