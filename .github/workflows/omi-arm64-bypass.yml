@@ -239,3 +239,5 @@ jobs:
 # trigger: keep local session on null user
 
 # trigger: listener guard included
+
+# trigger: gate returns benign status

@@ -54,6 +54,11 @@ PROVIDER_BRANCH_NEW = """    setLoadingState(true);
 CHECK_DELETION_OLD = """  Future<ApiResult<AccountDeletionStatus>> checkAccountDeletion({bool refresh = false}) {
     final uid = _auth.currentUser?.uid;"""
 CHECK_DELETION_NEW = """  Future<ApiResult<AccountDeletionStatus>> checkAccountDeletion({bool refresh = false}) {
+    if (kLocalDevSessionBypass) {
+      // Verification harness: no server-side deletion state is reachable for a
+      // locally minted session, so the gate reports the benign state.
+      return Future<ApiResult<AccountDeletionStatus>>.value(const ApiSuccess(AccountDeletionStatus()));
+    }
     // Verification harness: the session lives in preferences, not in the native SDK.
     final localToken = SharedPreferencesUtil().authToken;
     final uid = _auth.currentUser?.uid ??
