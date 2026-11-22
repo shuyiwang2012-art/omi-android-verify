@@ -64,6 +64,21 @@ jobs:
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
 
+      - name: Checkout harness patches
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: main
+          path: harness
+          sparse-checkout: |
+            patches
+          sparse-checkout-cone-mode: true
+
+      - name: Apply local_dev session bypass patch
+        run: |
+          python3 harness/patches/apply_bypass.py
+          grep -n "kLocalDevSessionBypass" app/lib/providers/auth_provider.dart app/lib/services/auth_service.dart | head
+
       - name: Pin PostHog android SDK to 3.77.1
         run: |
           python3 - <<'PYEOF' 2>&1 | tee pin.log
@@ -142,7 +157,8 @@ jobs:
         run: |
           set -o pipefail
           flutter build apk --debug --flavor dev --target-platform android-arm64 \
-            --dart-define=OMI_APP_PROFILE=local_dev 2>&1 | tee ../build_arm64.log
+            --dart-define=OMI_APP_PROFILE=local_dev \
+            --dart-define=OMI_LOCAL_SESSION_BYPASS=true 2>&1 | tee ../build_arm64.log
           ls -lh build/app/outputs/flutter-apk/ | tee -a ../build_arm64.log
 
       - name: Upload diagnostics artifact
